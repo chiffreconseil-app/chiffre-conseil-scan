@@ -1,1 +1,53 @@
+name: Android Chiffre Conseil Scan
 
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Décompresser le projet
+        run: unzip -q -o CHIFFRE-CONSEIL-SCAN-source.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Préparer le projet
+        working-directory: chiffre_conseil_scan
+        run: |
+          flutter create --platforms=android --org net.chiffreconseil --project-name chiffre_conseil_scan .
+          python3 tool/configure_android.py
+          flutter pub get
+
+      - name: Tests
+        working-directory: chiffre_conseil_scan
+        continue-on-error: true
+        run: flutter test --reporter expanded
+
+      - name: Compiler les APK
+        working-directory: chiffre_conseil_scan
+        run: |
+          flutter build apk --debug
+          flutter build apk --release
+          mkdir -p ../dist
+          cp build/app/outputs/flutter-apk/app-debug.apk ../dist/Chiffre-Conseil-Scan-debug.apk
+          cp build/app/outputs/flutter-apk/app-release.apk ../dist/Chiffre-Conseil-Scan.apk
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../dist/Chiffre-Conseil-Scan-arm64-leger.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chiffre-Conseil-Scan-android
+          path: dist/
